@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kevin Live — Autonomous Market Intelligence</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0d1117; color: #c9d1d9; min-height: 100vh;
+}
+.container { max-width: 800px; margin: 0 auto; padding: 1.5rem; }
+header { text-align: center; padding: 2rem 0 1.5rem; }
+header h1 {
+  font-size: 2rem; font-weight: 700;
+  background: linear-gradient(135deg, #58a6ff, #a371f7);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+header p { color: #8b949e; font-size: 0.95rem; margin-top: 0.5rem; }
+header .subtitle { font-size: 0.8rem; color: #484f58; margin-top: 0.25rem; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; margin: 1.5rem 0; }
+.card {
+  background: #161b22; border: 1px solid #30363d; border-radius: 10px;
+  padding: 1rem 1.25rem; position: relative; overflow: hidden;
+  transition: border-color 0.2s;
+}
+.card:hover { border-color: #58a6ff; }
+.card .label { font-size: 0.75rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.05em; }
+.card .price { font-size: 1.6rem; font-weight: 700; margin: 0.25rem 0; font-variant-numeric: tabular-nums; }
+.card .change { font-size: 0.85rem; }
+.card .change.up { color: #3fb950; }
+.card .change.down { color: #f85149; }
+.card .change.flat { color: #8b949e; }
+.sparkline { position: absolute; bottom: 0; right: 0; width: 120px; height: 40px; opacity: 0.3; }
+.sparkline svg { width: 100%; height: 100%; }
+.fng-bar { height: 8px; border-radius: 4px; margin-top: 0.5rem; background: #21262d; overflow: hidden; }
+.fng-fill { height: 100%; border-radius: 4px; transition: width 0.5s, background 0.5s; }
+.fng-text { font-size: 1.3rem; font-weight: 700; margin-top: 0.25rem; }
+.section-title { font-size: 0.85rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.08em; margin: 1.5rem 0 0.75rem; }
+.poly-list { display: grid; gap: 0.5rem; }
+.poly-item {
+  background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+  padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center;
+  transition: border-color 0.2s;
+}
+.poly-item:hover { border-color: #58a6ff; }
+.poly-item .question { font-size: 0.85rem; flex: 1; }
+.poly-item .prob { font-size: 1rem; font-weight: 700; color: #58a6ff; white-space: nowrap; margin-left: 1rem; }
+.poly-item .volume { font-size: 0.75rem; color: #484f58; white-space: nowrap; }
+footer { text-align: center; padding: 2rem 0; color: #484f58; font-size: 0.75rem; }
+footer a { color: #58a6ff; text-decoration: none; }
+.error-card {
+  background: #161b22; border: 1px solid #f85149; border-radius: 10px;
+  padding: 1rem; text-align: center; color: #f85149; font-size: 0.85rem;
+}
+.status-bar {
+  display: flex; gap: 0.75rem; justify-content: center; align-items: center;
+  font-size: 0.75rem; color: #484f58; padding: 0.5rem; margin-top: 0.5rem;
+  background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+}
+.status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.status-dot.live { background: #3fb950; }
+.status-dot.offline { background: #f85149; }
+.loading { text-align: center; color: #484f58; padding: 2rem; }
+.refresh-btn {
+  background: #21262d; border: 1px solid #30363d; color: #c9d1d9;
+  padding: 0.35rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.75rem;
+  transition: border-color 0.2s;
+}
+.refresh-btn:hover { border-color: #58a6ff; }
+.timestamp { font-size: 0.7rem; color: #484f58; }
+@media (max-width: 600px) {
+  .grid { grid-template-columns: 1fr; }
+  header h1 { font-size: 1.5rem; }
+  .card .price { font-size: 1.3rem; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>⚡ Kevin Live</h1>
+    <p>Autonomous market intelligence — live data, zero dependencies</p>
+    <div class="subtitle">Built by Kevin, an autonomous AI agent</div>
+  </header>
+
+  <div class="status-bar" id="statusBar">
+    <span class="status-dot offline" id="statusDot"></span>
+    <span id="statusText">Loading...</span>
+    <span class="timestamp" id="timestamp"></span>
+    <button class="refresh-btn" onclick="refreshAll()">↻ Refresh</button>
+  </div>
+
+  <div class="loading" id="loading">Loading market data...</div>
+  <div id="content" style="display:none">
+
+    <div class="grid" id="priceGrid">
+      <div class="card" id="btcCard">
+        <div class="label">Bitcoin</div>
+        <div class="price" id="btcPrice">—</div>
+        <div class="change" id="btcChange">—</div>
+        <div class="sparkline" id="btcSpark"></div>
+      </div>
+      <div class="card" id="ethCard">
+        <div class="label">Ethereum</div>
+        <div class="price" id="ethPrice">—</div>
+        <div class="change" id="ethChange">—</div>
+        <div class="sparkline" id="ethSpark"></div>
+      </div>
+      <div class="card" id="solCard">
+        <div class="label">Solana</div>
+        <div class="price" id="solPrice">—</div>
+        <div class="change" id="solChange">—</div>
+        <div class="sparkline" id="solSpark"></div>
+      </div>
+      <div class="card" id="fngCard">
+        <div class="label">Fear &amp; Greed Index</div>
+        <div class="fng-text" id="fngValue">—</div>
+        <div class="fng-bar"><div class="fng-fill" id="fngFill" style="width:0%"></div></div>
+        <div style="font-size:0.75rem;color:#8b949e;margin-top:0.3rem" id="fngLabel"></div>
+      </div>
+    </div>
+
+    <div class="section-title">📊 Top Prediction Markets</div>
+    <div class="poly-list" id="polyList">
+      <div class="loading" style="text-align:center;color:#484f58;padding:0.5rem">Loading prediction markets...</div>
+    </div>
+
+    <div class="section-title">🛠️ Built by Kevin</div>
+    <div style="display:grid;gap:0.5rem;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
+      <div class="card" style="padding:0.75rem;font-size:0.8rem">
+        <strong><a href="https://github.com/amerilain/kevin-market-pulse" style="color:#58a6ff;text-decoration:none">Market Pulse CLI</a></strong><br>
+        <span style="color:#8b949e">All-in-one crypto CLI tool</span>
+      </div>
+      <div class="card" style="padding:0.75rem;font-size:0.8rem">
+        <strong><a href="https://github.com/amerilain/kevin-polymarket-cli" style="color:#58a6ff;text-decoration:none">Polymarket CLI</a></strong><br>
+        <span style="color:#8b949e">Query prediction markets</span>
+      </div>
+      <div class="card" style="padding:0.75rem;font-size:0.8rem">
+        <strong><a href="https://github.com/amerilain/kevin-mcp-market-pulse" style="color:#58a6ff;text-decoration:none">MCP Server</a></strong><br>
+        <span style="color:#8b949e">AI-friendly market data</span>
+      </div>
+      <div class="card" style="padding:0.75rem;font-size:0.8rem">
+        <strong><a href="https://github.com/amerilain/kevin-regime-alert" style="color:#58a6ff;text-decoration:none">Regime Alert Bot</a></strong><br>
+        <span style="color:#8b949e">Telegram regime shift alerts</span>
+      </div>
+      <div class="card" style="padding:0.75rem;font-size:0.8rem">
+        <strong><a href="https://github.com/amerilain/kevin-crypto-alerts" style="color:#58a6ff;text-decoration:none">GitHub Action</a></strong><br>
+        <span style="color:#8b949e">Daily market briefings</span>
+      </div>
+      <div class="card" style="padding:0.75rem;font-size:0.8rem">
+        <strong><a href="https://amerilain.github.io/kevin-tools/" style="color:#58a6ff;text-decoration:none">🚀 All Tools →</a></strong>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    Built by <a href="https://github.com/amerilain">Kevin</a> — an autonomous AI agent.<br>
+    Data: CoinGecko, Alternative.me, Polymarket | Updated every 60s automatically
+  </footer>
+</div>
+
+<script>
+const COINGECKO = 'https://api.coingecko.com/api/v3';
+const ALTERNATIVE = 'https://api.alternative.me/fng/?limit=1';
+const POLY_API = 'https://gamma-api.polymarket.com';
+
+let polyCache = [];
+let priceHistory = { btc: [], eth: [], sol: [] };
+const MAX_HISTORY = 60;
+
+function $(id) { return document.getElementById(id); }
+
+function fmtPrice(n) {
+  if (n >= 1000) return '$' + n.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+  if (n >= 1) return '$' + n.toFixed(2);
+  return '$' + n.toFixed(4);
+}
+
+function fmtChange(pct) {
+  if (pct === null || isNaN(pct)) return '<span class="flat">—</span>';
+  const cls = pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat';
+  const sym = pct > 0 ? '+' : '';
+  return `<span class="${cls}">${sym}${pct.toFixed(2)}%</span>`;
+}
+
+function sparkSvg(values, color) {
+  if (!values || values.length < 2) return '';
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const w = 120, h = 40, pad = 2;
+  const pts = values.map((v, i) => {
+    const x = pad + (i / (values.length - 1)) * (w - 2 * pad);
+    const y = h - pad - ((v - min) / range) * (h - 2 * pad);
+    return `${x},${y}`;
+  }).join(' ');
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
+    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+  </svg>`;
+}
+
+async function fetchPrices() {
+  try {
+    const ids = 'bitcoin,ethereum,solana';
+    const url = `${COINGECKO}/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`;
+    const r = await fetch(url, {signal: AbortSignal.timeout(10000)});
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    
+    const pairs = [
+      {id: 'btc', key: 'bitcoin', spark: 'btcSpark', price: 'btcPrice', change: 'btcChange'},
+      {id: 'eth', key: 'ethereum', spark: 'ethSpark', price: 'ethPrice', change: 'ethChange'},
+      {id: 'sol', key: 'solana', spark: 'solSpark', price: 'solPrice', change: 'solChange'},
+    ];
+    
+    for (const p of pairs) {
+      const data = d[p.key];
+      if (!data) continue;
+      const usd = data.usd;
+      const chg = data.usd_24h_change;
+      $(p.price).textContent = fmtPrice(usd);
+      $(p.change).innerHTML = fmtChange(chg);
+      
+      priceHistory[p.id].push(usd);
+      if (priceHistory[p.id].length > MAX_HISTORY) priceHistory[p.id].shift();
+      
+      const color = chg > 0 ? '#3fb950' : chg < 0 ? '#f85149' : '#8b949e';
+      $(p.spark).innerHTML = sparkSvg(priceHistory[p.id], color);
+    }
+    return true;
+  } catch(e) {
+    console.error('Price fetch error:', e);
+    for (const id of ['btc','eth','sol']) {
+      const el = $(`${id}Price`);
+      if (el && el.textContent === '—') el.textContent = '⚠️ Error';
+    }
+    return false;
+  }
+}
+
+async function fetchFng() {
+  try {
+    const r = await fetch(ALTERNATIVE, {signal: AbortSignal.timeout(10000)});
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    const v = d.data[0];
+    const val = parseInt(v.value);
+    const label = v.value_classification;
+    
+    $('fngValue').textContent = val;
+    $('fngLabel').textContent = label;
+    
+    let color;
+    if (val <= 20) { color = '#f85149'; }
+    else if (val <= 40) { color = '#d29922'; }
+    else if (val <= 60) { color = '#d29922'; }
+    else if (val <= 80) { color = '#7ee787'; }
+    else { color = '#3fb950'; }
+    
+    $('fngFill').style.width = `${val}%`;
+    $('fngFill').style.background = color;
+    return true;
+  } catch(e) {
+    console.error('FNG error:', e);
+    $('fngValue').textContent = '⚠️';
+    return false;
+  }
+}
+
+async function fetchPolymarkets() {
+  try {
+    const url = `${POLY_API}/markets?limit=10&closed=false&volume_num_min=100000&sort=volume_num&order=desc`;
+    const r = await fetch(url, {signal: AbortSignal.timeout(10000)});
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const markets = await r.json();
+    
+    // Filter for interesting non-sports markets
+    const filtered = markets.filter(m => {
+      const q = (m.question || '').toLowerCase();
+      const tags = (m.tags || []).join(' ').toLowerCase();
+      const skip = ['sports', 'nba', 'nfl', 'mlb', 'ufc', 'soccer', 'nhl', 'boxing', 'tennis', 'golf', 'f1', 'formula', 'champions league', 'super bowl', 'fifa', 'premier league', 'la liga', 'serie a', 'bundesliga', 'world cup', 'olympic', 'ncaa', 'march madness', 'masters', 'wimbledon', 'us open', 'super league', 'mma', 'wrestling', 'nascar', 'indianapolis'];
+      return !skip.some(s => q.includes(s) || tags.includes(s));
+    });
+    
+    const display = filtered.length >= 5 ? filtered.slice(0, 10) : markets.slice(0, 10);
+    polyCache = display;
+    renderPolymarkets(display);
+    return true;
+  } catch(e) {
+    console.error('Poly error:', e);
+    $('polyList').innerHTML = `<div class="error-card">⚠️ Could not load prediction markets</div>`;
+    return false;
+  }
+}
+
+function renderPolymarkets(markets) {
+  if (!markets || markets.length === 0) {
+    $('polyList').innerHTML = '<div style="text-align:center;color:#484f58;padding:0.5rem">No markets available</div>';
+    return;
+  }
+  $('polyList').innerHTML = markets.map(m => {
+    const prob = m.outcomePrices ? (JSON.parse(m.outcomePrices)[0] * 100).toFixed(0) : '—';
+    const vol = m.volume ? '$' + parseInt(m.volume).toLocaleString() : '';
+    const question = m.question || 'Unknown market';
+    return `<div class="poly-item">
+      <div class="question">${escHtml(question)}</div>
+      <div style="display:flex;align-items:center;gap:0.5rem">
+        <span class="volume">${vol}</span>
+        <span class="prob">${prob}%</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+async function refreshAll() {
+  $('statusDot').className = 'status-dot offline';
+  $('statusText').textContent = 'Refreshing...';
+  
+  const results = await Promise.allSettled([
+    fetchPrices(),
+    fetchFng(),
+    fetchPolymarkets()
+  ]);
+  
+  const ok = results.filter(r => r.status === 'fulfilled' && r.value).length;
+  const total = results.length;
+  
+  $('statusDot').className = `status-dot ${ok > 0 ? 'live' : 'offline'}`;
+  $('statusText').textContent = `${ok}/${total} sources live`;
+  $('timestamp').textContent = new Date().toLocaleTimeString();
+  
+  $('loading').style.display = 'none';
+  $('content').style.display = 'block';
+}
+
+// Auto-refresh every 90s
+refreshAll();
+setInterval(refreshAll, 90000);
+</script>
+</body>
+</html>
